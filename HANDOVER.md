@@ -30,11 +30,11 @@ Last updated: October 9, 2026. This repository is separate from `TransferGuard`;
 
 ## Remaining blockers for hosting
 
-1. Create a Google Cloud OAuth Web application client and configure its client ID and secret in the local `.env` and Render secret prompts. Add these exact redirect URIs:
-   - Local: `http://127.0.0.1:8080/auth/google/callback`
-   - Hosted: `https://<actual-render-hostname>/auth/google/callback`
-2. Connect this repository to a GitHub repository that Render can access. The current checkout has no commit or remote.
-3. Create the Render Blueprint from `render.yaml`, enter the Airwallex and Google secrets in Render, and verify the deployed sign-in and sandbox read-only workflow.
+1. Create a development Google OAuth project/client for local use with redirect URI `http://127.0.0.1:8080/auth/google/callback`.
+2. For public production sign-in, use a domain the user owns and can verify. Google policy says production OAuth domains associated with the homepage and redirect URI must be verified. The Render shared subdomain alone may not satisfy this. Configure a public homepage and privacy policy as part of production branding.
+3. Create a separate production Google OAuth project/client. Set its redirect URI to `https://<owned-domain>/auth/google/callback`; add production credentials in Render, not GitHub or chat.
+4. The repository is now pushed to `https://github.com/demonchant/adaptive-treasure-controller.git`, branch `main`, commit `8376813`. `.env` is ignored and was not pushed.
+5. Connect GitHub to Render, create the Blueprint from `render.yaml`, enter the Airwallex and production Google secrets in Render, and verify sign-in plus the read-only sandbox workflow.
 
 The current deployment plan is about $7.25/month at listed Starter and 1 GB disk rates, before taxes or usage outside included limits. Recheck the dashboard price when creating it. See `docs/deployment.md`.
 

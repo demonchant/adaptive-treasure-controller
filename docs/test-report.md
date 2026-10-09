@@ -17,6 +17,6 @@ A separate read-only request using the configured local `.env` successfully auth
 
 - The real Google OAuth client ID and secret are not configured yet, so visitor sign-in is not ready in the local or hosted deployment.
 - Real Airwallex sandbox authentication and the current USD cash balance read are verified. Transfer validation, transfer creation, and provider read-back have not been verified.
-- No public hosting deployment exists yet. The Render Blueprint is prepared, but the repository has no remote and no Render or Google Cloud account is connected to this workspace.
+- No public hosting deployment exists yet. The code is pushed to `https://github.com/demonchant/adaptive-treasure-controller.git`, branch `main`. A Render or Google Cloud account is not connected to this workspace.
 
 See [`verification-plan.md`](verification-plan.md) and [`deployment.md`](deployment.md) for remaining setup steps.
