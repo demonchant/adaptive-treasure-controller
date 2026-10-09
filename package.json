@@ -1,0 +1,21 @@
+{
+  "name": "adaptive-treasury-controller",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/airwallex.test.mjs test/google-auth.test.mjs test/money-planner.test.mjs test/server.test.mjs test/store.test.mjs",
+    "test:e2e": "playwright test",
+    "check": "node --check server.mjs && node --check public/app.js && node --check lib/airwallex.mjs && node --check lib/google-auth.mjs && node --check lib/money.mjs && node --check lib/planner.mjs && node --check lib/store.mjs && node --check test/e2e-server.mjs && node --check playwright.config.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "jose": "^6.2.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
+  }
+}

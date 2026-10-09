@@ -1,0 +1,2 @@
+.login-panel .button { display: inline-flex; align-items: center; gap: 12px; margin-top: 18px; text-decoration: none; }
+#user-email { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

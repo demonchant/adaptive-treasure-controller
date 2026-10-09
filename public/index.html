@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11191d"><title>Adaptive Treasury Controller</title>
+  <link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/auth.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/" aria-label="Adaptive Treasury Controller home"><span class="mark">A</span><span>ATC <small>TREASURY CONTROL</small></span></a><div class="topmeta"><span class="live-dot"></span><span>Airwallex Sandbox</span><span id="user-email"></span><button id="logout" class="text-button hidden">Sign out</button></div></header>
+  <main class="shell">
+    <section id="sign-in" class="login-panel hidden"><div class="eyebrow">YOUR PRIVATE WORKSPACE</div><h1>Decide with confidence.</h1><p>Sign in to open your own treasury workspace. Your obligations and decisions are stored separately from other visitors.</p><a id="google-login" class="button primary" href="/auth/google">Continue with Google <span>→</span></a><p id="login-error" class="error"></p></section>
+    <section id="workspace" class="hidden">
+      <div class="hero"><div><div class="eyebrow">LIQUIDITY DECISION WORKSPACE</div><h1>Make every dollar<br><em>earn its place.</em></h1><p>Recompute obligations against confirmed available cash. Protect the reserve. Approve only what the evidence supports.</p></div><div class="hero-actions"><button id="refresh-balance" class="button secondary">↻ Refresh Airwallex balance</button><span id="provider-status" class="muted"></span></div></div>
+      <div class="banner warning"><strong>Sandbox only.</strong> Obligations are operator-entered. Pending and expected receipts are never counted as spendable. No provider balance appears until a real API refresh succeeds.</div>
+      <section class="metrics" aria-label="Treasury summary">
+        <article class="metric"><div class="metric-label">AVAILABLE CASH <span>USD</span></div><div id="available-value" class="metric-value">—</div><div id="balance-time" class="metric-foot">Refresh Airwallex to begin</div></article>
+        <article class="metric"><div class="metric-label">PROTECTED RESERVE <span>POLICY</span></div><div id="reserve-value" class="metric-value">—</div><div class="metric-foot">Configured server-side</div></article>
+        <article class="metric"><div class="metric-label">SAFE TO ALLOCATE <span>AFTER RESERVE</span></div><div id="headroom-value" class="metric-value">—</div><div id="headroom-foot" class="metric-foot">Requires a fresh balance</div></article>
+        <article class="metric"><div class="metric-label">OPEN OBLIGATIONS <span>USD</span></div><div id="obligation-count" class="metric-value">0</div><div class="metric-foot">Manual records, not bank data</div></article>
+      </section>
+      <div class="columns">
+        <section class="panel obligations-panel"><div class="section-head"><div><div class="eyebrow">01 / OBLIGATIONS</div><h2>What must be paid?</h2></div><span class="tag">OPERATOR INPUT</span></div>
+          <form id="obligation-form" class="obligation-form">
+            <label>Obligation name<input name="name" placeholder="e.g. Cloud infrastructure" maxlength="80" required></label>
+            <div class="form-row"><label>Amount · USD<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label><label>Priority<select name="priority"><option>NORMAL</option><option>HIGH</option><option>CRITICAL</option></select></label></div>
+            <div class="form-row"><label>Due date<input name="dueAt" type="date" required></label><label>Airwallex beneficiary ID <span class="optional">optional until execution</span><input name="beneficiaryId" placeholder="bene_…" autocomplete="off"></label></div>
+            <button class="button primary full">Add obligation <span>＋</span></button>
+          </form>
+          <div id="obligations-list" class="obligations-list"></div>
+        </section>
+        <section class="panel decision-panel"><div class="section-head"><div><div class="eyebrow">02 / DECISION</div><h2>Current action plan</h2></div><button id="calculate-plan" class="button secondary small">Recalculate ↗</button></div>
+          <div id="plan-state" class="empty-state"><span class="empty-icon">⌁</span><h3>Balance first. Decision second.</h3><p>Refresh actual Airwallex USD cash, add obligations, then calculate a deterministic plan.</p></div>
+          <div id="plan-summary" class="plan-summary hidden"></div><div id="decisions-list" class="decisions-list"></div>
+        </section>
+      </div>
+      <section class="panel operations-panel"><div class="section-head"><div><div class="eyebrow">03 / EVIDENCE</div><h2>Provider operations</h2></div><span class="tag">RECONCILE BEFORE RETRY</span></div><div id="operations-list" class="operations-list"><p class="muted">No transfer operations yet.</p></div></section>
+      <footer><span>Adaptive Treasury Controller · v0.1</span><span>Decision support only · operator authorizes every transfer</span></footer>
+    </section>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </main>
+</body>
+</html>

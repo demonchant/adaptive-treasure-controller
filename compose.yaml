@@ -1,0 +1,24 @@
+services:
+  app:
+    build:
+      context: .
+      target: app
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      USER_DATA_DIRECTORY: /var/data/workspaces
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - treasury-data:/var/data
+    restart: unless-stopped
+  test:
+    build:
+      context: .
+      target: test
+    environment:
+      DATABASE_PATH: /tmp/test-treasury.sqlite
+    tmpfs:
+      - /tmp
+volumes:
+  treasury-data:

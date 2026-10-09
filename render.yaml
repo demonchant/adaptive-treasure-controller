@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: adaptive-treasury-controller
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /healthz
+    disk:
+      name: treasury-workspaces
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: USER_DATA_DIRECTORY
+        value: /var/data/workspaces
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: RESERVE_USD
+        value: 30.00
+      - key: BALANCE_MAX_AGE_SECONDS
+        value: "60"
+      - key: AWX_CLIENT_ID
+        sync: false
+      - key: AWX_API_KEY
+        sync: false
+      - key: AWX_LOGIN_AS
+        value: ""
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
