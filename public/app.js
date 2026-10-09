@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const money = (cents) => `$${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-let csrf = null; let state = null; let busy = false; let toastTimer;
+let csrf = null; let state = null; let busy = false; let toastTimer; let balanceRefreshInFlight = false; let balanceRefreshPromise = null;
 
 function toast(message, isError = false) {
   const element = $('#toast'); element.textContent = message; element.className = `toast show${isError ? ' error' : ''}`;
@@ -14,6 +14,32 @@ async function api(path, body) {
 }
 function setBusy(value) { busy = value; document.querySelectorAll('button').forEach((button) => { button.disabled = value; }); }
 async function refreshState() { state = await api('/api/state'); render(); }
+async function refreshBalance({ silent = false, allowBusy = false } = {}) {
+  if (balanceRefreshInFlight) return balanceRefreshPromise;
+  if ((busy && !allowBusy) || document.visibilityState !== 'visible') return false;
+  balanceRefreshInFlight = true;
+  balanceRefreshPromise = (async () => {
+    try {
+      const result = await api('/api/balance/refresh', {});
+      await refreshState();
+      if (!silent) toast(`Airwallex USD available balance refreshed: ${money(result.balance.availableCents)}`);
+      return true;
+    } catch (error) {
+      if (!silent) toast(error.message, true);
+      else $('#provider-status').textContent = 'Auto-sync paused · balance unavailable';
+      return false;
+    } finally {
+      balanceRefreshInFlight = false;
+      balanceRefreshPromise = null;
+    }
+  })();
+  return balanceRefreshPromise;
+}
+async function ensureFreshBalance() {
+  if (!state?.balanceStale) return;
+  const refreshed = await refreshBalance({ silent: true, allowBusy: true });
+  if (!refreshed || state?.balanceStale) throw new Error('Could not refresh the Airwallex balance. Try again when the connection is available.');
+}
 function render() {
   const balance = state?.balance;
   $('#available-value').textContent = balance ? money(balance.availableCents) : '—';
@@ -22,7 +48,7 @@ function render() {
   $('#balance-time').textContent = balance ? `${state.balanceStale ? 'STALE · ' : ''}${new Date(balance.capturedAt).toLocaleString()}` : 'Refresh Airwallex to begin';
   $('#headroom-foot').textContent = state?.balanceStale ? 'Refresh before planning or approval' : 'Pending balance excluded';
   $('#obligation-count').textContent = String(state?.obligations?.length ?? 0);
-  $('#provider-status').textContent = state?.sandboxConfigured ? 'Credentials configured' : 'Credentials not configured';
+  $('#provider-status').textContent = state?.sandboxConfigured ? 'Airwallex connected · auto-sync on' : 'Credentials not configured';
   $('#obligations-list').innerHTML = (state?.obligations ?? []).map((item) => `<div class="obligation-item"><div><div class="obligation-title">${escapeHtml(item.name)} <span class="priority ${item.priority}">${item.priority}</span></div><div class="obligation-detail">DUE ${new Date(item.dueAt).toLocaleDateString()} · ${item.beneficiaryId ? 'beneficiary linked' : 'no beneficiary ID'}</div></div><span class="amount">${money(item.amountCents)}</span></div>`).join('') || '<div class="empty-state"><p>No obligations yet. Add manually entered commitments to plan.</p></div>';
   const plan = state?.plan;
   $('#plan-state').classList.toggle('hidden', Boolean(plan)); $('#plan-summary').classList.toggle('hidden', !plan);
@@ -49,9 +75,9 @@ async function run(button, action) {
   finally { setBusy(false); render(); }
 }
 
-$('#refresh-balance').addEventListener('click', () => run(null, async () => { const result = await api('/api/balance/refresh', {}); toast(`Airwallex USD available balance refreshed: ${money(result.balance.availableCents)}`); }));
+$('#refresh-balance').addEventListener('click', () => run(null, async () => { await refreshBalance({ allowBusy: true }); }));
 $('#logout').addEventListener('click', async () => { try { await api('/api/logout', {}); location.reload(); } catch (error) { toast(error.message, true); } });
-$('#calculate-plan').addEventListener('click', () => run(null, async () => { const result = await api('/api/plan', {}); toast(`Plan revision ${result.plan.revision} calculated from available funds.`); }));
+$('#calculate-plan').addEventListener('click', () => run(null, async () => { await ensureFreshBalance(); const result = await api('/api/plan', {}); toast(`Plan revision ${result.plan.revision} calculated from available funds.`); }));
 $('#obligation-form').addEventListener('submit', (event) => run(null, async () => {
   event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form));
   await api('/api/obligations', { ...data, dueAt: new Date(`${data.dueAt}T23:59:59`).toISOString() }); form.reset(); form.elements.priority.value = 'NORMAL'; toast('Obligation added as operator-entered data. Recalculate the plan.');
@@ -59,6 +85,8 @@ $('#obligation-form').addEventListener('submit', (event) => run(null, async () =
 document.addEventListener('click', (event) => {
   const target = event.target.closest('button[data-approve],button[data-execute],button[data-reconcile]'); if (!target) return;
   if (target.dataset.approve) return run(target, async () => {
+    await ensureFreshBalance();
+    if (state.planStale) throw new Error('The balance changed. Recalculate the plan before approving.');
     const plan = state.plan; const id = target.dataset.approve; const decision = plan.decisions.find((item) => item.obligationId === id);
     const digest = JSON.stringify({ revision: plan.revision, obligationId: id, amountCents: decision.amountCents, availableCents: plan.availableCents, reserveCents: plan.reserveCents, inputHash: plan.inputHash, action: decision.action, overdue: decision.overdue, reason: decision.reason });
     await api('/api/approve', { revision: plan.revision, obligationId: id, digest }); toast('Exact plan action approved. Execute is a separate step.');
@@ -74,7 +102,16 @@ if (session.authenticated) {
   $('#workspace').classList.remove('hidden');
   $('#logout').classList.remove('hidden');
   $('#user-email').textContent = session.user?.email ?? '';
-  try { await refreshState(); } catch (error) { toast(error.message, true); }
+  try {
+    await refreshState();
+    if (state.sandboxConfigured) await refreshBalance({ silent: true });
+    window.setInterval(() => {
+      if (document.visibilityState === 'visible' && !busy && state?.sandboxConfigured) void refreshBalance({ silent: true });
+    }, 45_000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !busy && state?.sandboxConfigured) void refreshBalance({ silent: true });
+    });
+  } catch (error) { toast(error.message, true); }
 } else {
   $('#workspace').classList.add('hidden');
   $('#sign-in').classList.remove('hidden');

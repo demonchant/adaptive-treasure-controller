@@ -11,7 +11,7 @@ import { TreasuryStore } from './lib/store.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const publicRoot = resolve(root, 'public');
-const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
+const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png' };
 const planHash = (balance, reserveCents, obligations, asOf = Date.now()) => createHash('sha256').update(JSON.stringify({ availableCents: balance.availableCents, reserveCents, obligations: obligations.map(({ id, name, beneficiaryId, amountCents, currency, dueAt, priority, penaltyCents }) => ({ id, name, beneficiaryId, amountCents, currency, dueAt, priority, penaltyCents, overdue: Date.parse(dueAt) < asOf })) })).digest('hex');
 
 function equalSecret(a, b) {
