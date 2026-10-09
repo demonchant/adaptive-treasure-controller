@@ -5,3 +5,10 @@ coverage/
 test-results/
 playwright-report/
 *.log
+/BUILD_LOG.md
+/HANDOVER.md
+/.envv
+/sign-in-bg.png
+/treasury-bg.png
+/docs/*
+!/docs/setup-guide.md
