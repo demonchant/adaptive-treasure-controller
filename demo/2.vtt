@@ -1,0 +1,58 @@
+WEBVTT
+
+00:00:00.100 --> 00:00:07.637
+Small teams often manage their cash balance, upcoming bills, and payment approvals in separate places.
+
+00:00:07.587 --> 00:00:14.600
+That makes a simple question hard to answer: what can we pay now without spending money reserved for essentials?
+
+00:00:14.600 --> 00:00:19.575
+Adaptive Treasury Controller brings that decision into one reviewable workflow.
+
+00:00:20.100 --> 00:00:26.859
+ATC is a decision-support workspace for manually entered obligations against Airwallex sandbox USD cash.
+
+00:00:26.809 --> 00:00:30.000
+It refreshes confirmed available balance.
+
+00:00:30.000 --> 00:00:32.666
+Pending funds are not counted.
+
+00:00:32.666 --> 00:00:37.059
+The protected reserve stays separate from cash available to allocate.
+
+00:00:37.059 --> 00:00:42.845
+Operators enter each bill's amount, due date, priority, and optional beneficiary.
+
+00:00:42.845 --> 00:00:49.761
+A deterministic planner considers the configured fee cap and marks each item to pay, defer, or escalate.
+
+00:00:49.761 --> 00:00:54.916
+Here, the visible thirty-dollar obligation reserves up to one dollar for the payer fee.
+
+00:00:54.916 --> 00:01:00.809
+When a balance or obligation changes, the previous plan is marked stale and must be recalculated.
+
+00:01:00.809 --> 00:01:03.679
+Approval records the exact action.
+
+00:01:03.679 --> 00:01:05.678
+It does not move money.
+
+00:01:05.678 --> 00:01:11.035
+Execution is a separate sandbox step that requires a beneficiary and a fresh balance.
+
+00:01:11.035 --> 00:01:18.107
+ATC records provider status, detects unverified costs, and requires reconciliation before retries.
+
+00:01:18.107 --> 00:01:21.880
+Each signed-in operator gets an isolated workspace.
+
+00:01:21.880 --> 00:01:31.142
+ATC addresses fragmented payment planning with a shared view of cash, obligations, reserve, human approval, and provider operation history.
+
+00:01:31.142 --> 00:01:36.273
+This video ends with planning and approval; it does not show a completed transfer.
+
+00:01:36.273 --> 00:01:44.261
+The app handles USD-only sandbox payouts, and operators remain responsible for accurate obligations and beneficiary details.

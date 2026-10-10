@@ -4,6 +4,7 @@ node_modules/
 coverage/
 test-results/
 playwright-report/
+/build/
 *.log
 /BUILD_LOG.md
 /HANDOVER.md
@@ -12,3 +13,4 @@ playwright-report/
 /treasury-bg.png
 /docs/*
 !/docs/setup-guide.md
+!/docs/*.md

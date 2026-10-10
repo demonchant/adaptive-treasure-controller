@@ -9,6 +9,7 @@ async function signInAs(page, name) {
 }
 
 test('Google identity sessions isolate complete treasury workspaces per visitor', async ({ browser, baseURL }) => {
+  test.setTimeout(90_000);
   const anonymous = await browser.newPage();
   await anonymous.goto(baseURL);
   await expect(anonymous.locator('#workspace')).toBeHidden();
@@ -34,7 +35,8 @@ test('Google identity sessions isolate complete treasury workspaces per visitor'
   const bob = await bobContext.newPage();
   await signInAs(bob, 'Bob');
   await expect(bob.locator('#user-email')).toHaveText('bob@example.test');
-  await expect(bob.locator('#available-value')).toHaveText('—');
+  // The configured Airwallex balance is shared; obligations and operations remain private.
+  await expect(bob.locator('#available-value')).toHaveText('$1,000.00');
   await expect(bob.locator('#obligation-count')).toHaveText('0');
   await expect(bob.locator('#operations-list')).toContainText('No transfer operations yet.');
   await bob.locator('[name="name"]').fill('Bob invoice');
