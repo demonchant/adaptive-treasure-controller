@@ -21,7 +21,7 @@ test('HTTP workflow uses passwordless sessions, CSRF, changed-input approvals, t
     findTransferByRequestId: async () => null,
     retrieveTransfer: async (id) => ({ id, status: 'PROCESSING' }),
   };
-  const app = createApplication({ store, airwallex, identityProvider: testIdentityProvider, reserveCents: 1000, balanceMaxAgeSeconds: 60 });
+  const app = createApplication({ store, airwallex, identityProvider: testIdentityProvider, reserveCents: 1000, maxTransferFeeCents: 100, balanceMaxAgeSeconds: 60 });
   await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise((resolve) => app.server.close(resolve)); store.close(); rmSync(directory, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -54,7 +54,7 @@ test('balance and obligation changes block stale-plan approval', async (t) => {
   const directory = mkdtempSync(join(tmpdir(), 'treasury-stale-')); const store = new TreasuryStore(join(directory, 'state.sqlite'));
   const airwallex = { configured: () => false, currentUsdCashBalance: async () => ({ currency: 'USD', availableCents: 10000, pendingCents: 0, reservedCents: 0, raw: {} }) };
   let currentNow = Date.now();
-  const app = createApplication({ store, airwallex, identityProvider: testIdentityProvider, reserveCents: 1000, balanceMaxAgeSeconds: 60, now: () => currentNow });
+  const app = createApplication({ store, airwallex, identityProvider: testIdentityProvider, reserveCents: 1000, maxTransferFeeCents: 100, balanceMaxAgeSeconds: 60, now: () => currentNow });
   await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise((resolve) => app.server.close(resolve)); store.close(); rmSync(directory, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${app.server.address().port}`;
@@ -82,7 +82,7 @@ test('provider cost mismatch is persisted, redacted, and blocks a second payout'
     retrieveTransfer: async (id) => ({ id, status: 'PROCESSING' }),
     findTransferByRequestId: async () => null,
   };
-  const app = createApplication({ store, airwallex, identityProvider: testIdentityProvider, reserveCents: 1000 });
+  const app = createApplication({ store, airwallex, identityProvider: testIdentityProvider, reserveCents: 1000, maxTransferFeeCents: 50 });
   await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await new Promise((resolve) => app.server.close(resolve)); store.close(); rmSync(directory, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${app.server.address().port}`;

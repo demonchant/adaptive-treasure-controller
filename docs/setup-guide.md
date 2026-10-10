@@ -18,6 +18,8 @@ http://127.0.0.1:8080/auth/google/callback
 
 Use a scoped sandbox API key with permission to read balances and read/write payout transfers. `RESERVE_USD` sets the protected reserve; it defaults to `30.00`.
 
+Set `MAX_TRANSFER_FEE_USD` to a positive, conservative maximum fee for one USD payout, based on the fee schedule for the configured Airwallex account and route. The planner reserves the obligation amount plus this fee cap. The transfer uses payer-pays fees, so the beneficiary receives the entered obligation amount. Airwallex's validation response is not a fee quote; ATC checks the actual payer cost returned after transfer creation and flags any missing or out-of-cap amount for reconciliation. Leave the value unset until you have verified the fee schedule; approvals and execution remain disabled while it is unset. On Render, add this value as a service environment variable, then recalculate and approve a new plan.
+
 ## Start the application
 
 ```sh

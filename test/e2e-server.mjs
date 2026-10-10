@@ -37,7 +37,7 @@ const airwallex = {
 };
 
 const generatedDataDirectory = process.env.E2E_DATA_DIRECTORY ? null : mkdtempSync(join(tmpdir(), 'atc-playwright-'));
-const app = createApplication({ identityProvider, airwallex, dataDirectory: process.env.E2E_DATA_DIRECTORY ?? generatedDataDirectory });
+const app = createApplication({ identityProvider, airwallex, maxTransferFeeCents: 100, dataDirectory: process.env.E2E_DATA_DIRECTORY ?? generatedDataDirectory });
 await new Promise((resolve) => app.server.listen(appPort, '127.0.0.1', resolve));
 process.stdout.write(`Playwright app listening on ${appBaseUrl}\n`);
 

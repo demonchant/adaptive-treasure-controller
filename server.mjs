@@ -12,7 +12,7 @@ import { TreasuryStore } from './lib/store.mjs';
 const root = fileURLToPath(new URL('.', import.meta.url));
 const publicRoot = resolve(root, 'public');
 const mime = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png' };
-const planHash = (balance, reserveCents, obligations, asOf = Date.now()) => createHash('sha256').update(JSON.stringify({ availableCents: balance.availableCents, reserveCents, obligations: obligations.map(({ id, name, beneficiaryId, amountCents, currency, dueAt, priority, penaltyCents }) => ({ id, name, beneficiaryId, amountCents, currency, dueAt, priority, penaltyCents, overdue: Date.parse(dueAt) < asOf })) })).digest('hex');
+const planHash = (balance, reserveCents, obligations, asOf = Date.now(), maxTransferFeeCents = null) => createHash('sha256').update(JSON.stringify({ availableCents: balance.availableCents, reserveCents, maxTransferFeeCents, obligations: obligations.map(({ id, name, beneficiaryId, amountCents, currency, dueAt, priority, penaltyCents }) => ({ id, name, beneficiaryId, amountCents, currency, dueAt, priority, penaltyCents, overdue: Date.parse(dueAt) < asOf })) })).digest('hex');
 
 function equalSecret(a, b) {
   const left = Buffer.from(String(a)); const right = Buffer.from(String(b));
@@ -37,10 +37,12 @@ export function createApplication({
   airwallex = new AirwallexClient(),
   identityProvider = new GoogleIdentityProvider(),
   reserveCents = parseCents(process.env.RESERVE_USD ?? '30.00', 'RESERVE_USD'),
+  maxTransferFeeCents = process.env.MAX_TRANSFER_FEE_USD?.trim() ? parseCents(process.env.MAX_TRANSFER_FEE_USD, 'MAX_TRANSFER_FEE_USD') : null,
   balanceMaxAgeSeconds = Number(process.env.BALANCE_MAX_AGE_SECONDS ?? 60),
   now = () => Date.now(),
 } = {}) {
   const sessions = new Map();
+  if (maxTransferFeeCents !== null && (!Number.isSafeInteger(maxTransferFeeCents) || maxTransferFeeCents <= 0)) throw new RangeError('MAX_TRANSFER_FEE_USD must be a positive amount when configured.');
   const oauthStates = new Map();
   const signInAttempts = new Map();
   const workspaceStores = new Map();
@@ -115,8 +117,8 @@ export function createApplication({
       if (req.method === 'GET' && url.pathname === '/api/state') {
         const balance = workspaceStore.latestBalance(); const plan = workspaceStore.plan();
         const obligations = workspaceStore.obligations();
-        const planStale = Boolean(plan && balance && planHash(balance, reserveCents, obligations, now()) !== workspaceStore.planInputHash(plan.revision));
-        return json(res, 200, { balance, balanceStale: !balance || now() - Date.parse(balance.capturedAt) > balanceMaxAgeSeconds * 1000, obligations, plan, planStale, approvals: plan ? workspaceStore.approvals(plan.revision) : [], operations: workspaceStore.operations(), sandboxConfigured: airwallex.configured(), reserveCents });
+        const planStale = Boolean(plan && balance && planHash(balance, reserveCents, obligations, now(), maxTransferFeeCents) !== workspaceStore.planInputHash(plan.revision));
+        return json(res, 200, { balance, balanceStale: !balance || now() - Date.parse(balance.capturedAt) > balanceMaxAgeSeconds * 1000, obligations, plan, planStale, approvals: plan ? workspaceStore.approvals(plan.revision) : [], operations: workspaceStore.operations(), sandboxConfigured: airwallex.configured(), reserveCents, maxTransferFeeCents, feeCapConfigured: maxTransferFeeCents !== null });
       }
       if (req.method === 'POST' && url.pathname === '/api/balance/refresh') {
         const snapshot = workspaceStore.saveBalance(await airwallex.currentUsdCashBalance()); return json(res, 200, { balance: snapshot });
@@ -135,15 +137,16 @@ export function createApplication({
         const balance = workspaceStore.latestBalance();
         if (!balance || now() - Date.parse(balance.capturedAt) > balanceMaxAgeSeconds * 1000) return json(res, 409, { error: 'Refresh an Airwallex USD cash balance before planning.' });
         const input = { availableCents: balance.availableCents, reserveCents, obligations: workspaceStore.obligations() };
-        const plan = buildPlan({ ...input, asOf: new Date(now()).toISOString() }); const inputHash = planHash(balance, reserveCents, input.obligations, now());
+        const plan = buildPlan({ ...input, maxTransferFeeCents, asOf: new Date(now()).toISOString() }); const inputHash = planHash(balance, reserveCents, input.obligations, now(), maxTransferFeeCents);
         return json(res, 200, { plan: workspaceStore.savePlan(balance, reserveCents, plan, inputHash) });
       }
       if (req.method === 'POST' && url.pathname === '/api/approve') {
         const body = await readJson(req); const plan = workspaceStore.plan();
+        if (maxTransferFeeCents === null) return json(res, 409, { error: 'Set MAX_TRANSFER_FEE_USD from your Airwallex fee schedule, then recalculate before approval.' });
         if (!plan || Number(body.revision) !== plan.revision) return json(res, 409, { error: 'Plan has changed; recalculate before approval.' });
         const currentBalance = workspaceStore.latestBalance();
         if (!currentBalance || now() - Date.parse(currentBalance.capturedAt) > balanceMaxAgeSeconds * 1000) return json(res, 409, { error: 'Balance is stale; refresh before approval.' });
-        if (!currentBalance || planHash(currentBalance, reserveCents, workspaceStore.obligations(), now()) !== workspaceStore.planInputHash(plan.revision)) return json(res, 409, { error: 'Inputs changed; recalculate before approval.' });
+        if (!currentBalance || planHash(currentBalance, reserveCents, workspaceStore.obligations(), now(), maxTransferFeeCents) !== workspaceStore.planInputHash(plan.revision)) return json(res, 409, { error: 'Inputs changed; recalculate before approval.' });
         const digest = approvalDigest(plan, String(body.obligationId ?? ''));
         if (body.digest !== digest) return json(res, 409, { error: 'Approval details do not match the current plan.' });
         const existing = workspaceStore.approval(plan.revision, body.obligationId);
@@ -155,33 +158,35 @@ export function createApplication({
         const action = async () => {
           const plan = workspaceStore.plan(); const obligation = workspaceStore.getObligation(String(body.obligationId ?? ''));
           if (!plan || Number(body.revision) !== plan.revision || !obligation) throw Object.assign(new Error('Plan or obligation is no longer current.'), { status: 409 });
+          if (maxTransferFeeCents === null) throw Object.assign(new Error('Set MAX_TRANSFER_FEE_USD from your Airwallex fee schedule, recalculate, and obtain approval before execution.'), { status: 409 });
           const approvedInputs = workspaceStore.latestBalance();
           if (!approvedInputs || now() - Date.parse(approvedInputs.capturedAt) > balanceMaxAgeSeconds * 1000) throw Object.assign(new Error('Balance is stale; refresh, recalculate, and approve again.'), { status: 409 });
-          if (!approvedInputs || planHash(approvedInputs, reserveCents, workspaceStore.obligations(), now()) !== workspaceStore.planInputHash(plan.revision)) throw Object.assign(new Error('Inputs changed; recalculate and obtain a new approval.'), { status: 409 });
+          if (!approvedInputs || planHash(approvedInputs, reserveCents, workspaceStore.obligations(), now(), maxTransferFeeCents) !== workspaceStore.planInputHash(plan.revision)) throw Object.assign(new Error('Inputs changed; recalculate and obtain a new approval.'), { status: 409 });
           const approval = workspaceStore.approval(plan.revision, obligation.id); const digest = approvalDigest(plan, obligation.id);
           if (!approval || !equalSecret(approval.approval_digest, digest)) throw Object.assign(new Error('A matching operator approval is required.'), { status: 403 });
           if (!obligation.beneficiaryId) throw Object.assign(new Error('Add a real Airwallex beneficiary ID before execution.'), { status: 422 });
           if (workspaceStore.operations().some((op) => op.obligation_id === obligation.id && ['SUBMITTING', 'OUTCOME_UNKNOWN', 'COST_UNVERIFIED', 'COST_MISMATCH', 'CREATED', 'IN_APPROVAL', 'SCHEDULED', 'PROCESSING', 'SENT'].includes(op.state))) throw Object.assign(new Error('An existing provider operation must be reconciled before another transfer.'), { status: 409 });
           const fresh = workspaceStore.saveBalance(await airwallex.currentUsdCashBalance());
-          const recomputed = buildPlan({ availableCents: fresh.availableCents, reserveCents: plan.reserveCents, obligations: workspaceStore.obligations() });
+          const recomputed = buildPlan({ availableCents: fresh.availableCents, reserveCents: plan.reserveCents, maxTransferFeeCents, obligations: workspaceStore.obligations() });
           const allowed = recomputed.decisions.find((item) => item.obligationId === obligation.id)?.action === 'PAY';
           if (!allowed || recomputed.availableCents !== plan.availableCents) {
             const changedPlan = workspaceStore.savePlan(fresh, plan.reserveCents, recomputed, 'execution-preflight');
             throw Object.assign(new Error(`Balance or decision changed; new plan revision ${changedPlan.revision} requires approval.`), { status: 409 });
           }
           const args = { requestId: randomUUID(), beneficiaryId: obligation.beneficiaryId, amountCents: obligation.amountCents, reference: obligation.name };
-          const validation = await airwallex.validateTransfer(args);
-          const payerPays = validation.amount_payer_pays ?? validation.transfer?.amount_payer_pays;
-          if (payerPays == null) throw Object.assign(new Error('Airwallex validation did not disclose payer cost; transfer blocked to protect reserve.'), { status: 409 });
-          const costCents = parseCents(payerPays, 'validated payer cost');
-          if (costCents > Math.max(0, fresh.availableCents - plan.reserveCents)) throw Object.assign(new Error('Validated payer cost would breach the reserve; transfer blocked.'), { status: 409 });
+          const maxPayerCostCents = obligation.amountCents + maxTransferFeeCents;
+          if (maxPayerCostCents > Math.max(0, fresh.availableCents - plan.reserveCents)) throw Object.assign(new Error('Obligation plus configured maximum fee would breach the reserve; transfer blocked.'), { status: 409 });
+          await airwallex.validateTransfer(args);
           const operation = workspaceStore.createOperation(args.requestId, obligation.id, approval.id);
           try {
             const result = await airwallex.createTransfer(args);
             let operationState = providerState(result.status ?? 'CREATED');
             try {
               if (result.amount_payer_pays == null) operationState = 'COST_UNVERIFIED';
-              else if (parseCents(result.amount_payer_pays, 'provider payer cost') !== costCents) operationState = 'COST_MISMATCH';
+              else {
+                const actualPayerCostCents = parseCents(result.amount_payer_pays, 'provider payer cost');
+                if (actualPayerCostCents < obligation.amountCents || actualPayerCostCents > maxPayerCostCents) operationState = 'COST_MISMATCH';
+              }
             } catch { operationState = 'COST_UNVERIFIED'; }
             workspaceStore.updateOperation(operation.id, operationState, result.id ?? result.transfer_id, result);
             return { operation: workspaceStore.operations().find((op) => op.id === operation.id) };
